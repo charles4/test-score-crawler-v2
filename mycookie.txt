@@ -1,0 +1,2 @@
+[General]
+cookies="@Variant(\0\0\0\x7f\0\0\0\x16QList<QNetworkCookie>\0\0\0\0\x1\0\0\0\x1\0\0\0pCoyote-2-41646c4c=ac10006e:0; expires=Mon, 03-Jun-2013 20:39:05 GMT; domain=www.assessmenttechnology.com; path=/)"
