@@ -13,6 +13,8 @@ import mechanize
 from datetime import date
 import csv
 
+import xlwt
+
 ### globals
 FINAL_DATA = {}
 SKIPPED_FIRST = False
@@ -157,6 +159,7 @@ def galileo_crawl():
 								option = subject_dropdown_options[k]
 
 								## check if GRADE is set
+								## if not, try to parse it from the subject name (where it is sometimes)
 								if GRADE == None:
 									GRADE = parse_grade_from_string(option.text)
 
@@ -175,7 +178,7 @@ def galileo_crawl():
 									try:
 										result_table = driver.find_element_by_id("tableResults")
 										result_table_rows = result_table.find_elements_by_tag_name("tr")
-										### use first row to deduce data structure
+										### use first row to deduce "data structure"
 										row = result_table_rows[0]
 										cols = row.find_elements_by_tag_name("td")
 
@@ -186,7 +189,7 @@ def galileo_crawl():
 												COLUMN_NAMES.append(col.text)
 
 											# map compiles to C for performance
-											# or so i've been told
+											# or so i've been told, it does seem faster
 											map(handle_row, result_table_rows)
 											## reset skipped first
 											SKIPPED_FIRST = False
@@ -312,8 +315,122 @@ def crawl():
 	print "There were %d scores." % score_count
 
 
+def write_column(worksheet, col, column_object):
+	ws = worksheet
+
+	ws.write(0, col, column_object.heading)
+
+	for x in range(len(column_object.data)):
+		ws.write(x+1, col, column_object.data[x])
+
+def write_to_excel_file(data):
+
+	# types of data we care about
+	DIBELS_DATA_TYPES = [ "Benchmark" ]
+	GALILEO_DATA_TYPES = [ "CBO", "CBAS", "Posttest"]
+	TEST_DATA_TYPES = [ "AIMS", "AIMS2"]
+
+	wb = xlwt.Workbook()
+	ws_kinder = wb.add_sheet('Kinder')
+	ws_first = wb.add_sheet('First')
+	ws_second = wb.add_sheet('Second')
+	ws_third = wb.add_sheet('Third')
+	ws_fourth = wb.add_sheet("Fourth")
+	ws_fifth = wb.add_sheet("Fifth")
+	ws_sixth = wb.add_sheet("Sixth")
+	ws_seventh = wb.add_sheet("Seventh")
+	ws_eighth = wb.add_sheet("Eighth")
+	ws_nineth = wb.add_sheet("Nineth")
+
+	### append ws to an array for easy access
+	ws_array = [ ws_kinder, ws_first, ws_second, ws_third, ws_fourth, ws_fifth, ws_sixth, ws_seventh, ws_eighth, ws_nineth ]
+
+	class Column(object):
+		def __init__(self, heading, data_array):
+			self.heading = heading
+			self.data = data_array
+
+	### go through each grade, building one column at a time
+
+	## 0-9
+	for grade in range(10):
+		### want array for guarenteed order
+		students = []
+		for key in data.keys():
+			if data[key].grade == grade:
+				students.append(data[key])
+
+
+		if len(students) > 0 : 
+			### build name column
+			student_names = []
+			for student in students:
+				student_names.append(student.name)
+			column0 = Column(heading="Student", data_array=student_names)
+
+			### find all types of scores
+			score_headings = set()
+			for student in students:
+				score_headings = set( score_headings | set(student.scores.keys()))
+
+			print "All headings = " + str(score_headings)
+
+			### build column for each score
+			score_columns = []
+			for heading in score_headings:
+				scores = []
+				for student in students:
+					try:
+						scores.append(student.scores[heading])
+					except KeyError:
+						### not all students will necessarily have taken the same tests
+						### and may have different headings
+						### so simply appenda  blank score if they dont' have the heading
+						scores.append("blank")
+						pass
+				score_columns.append(Column(heading=heading, data_array=scores))
+
+			## write name column
+			write_column(worksheet=ws_array[grade], col=0, column_object=column0)
+
+			## write other columns
+			col = 1
+			for column in score_columns:
+				### only write columns of approved data types
+				if column.heading.split("_")[0] in DIBELS_DATA_TYPES:
+					write_column(worksheet=ws_array[grade], col=col, column_object=column)
+					col += 1
+				print column.heading.split(" ")
+				if set(column.heading.split(" ")) & set(GALILEO_DATA_TYPES):
+					write_column(worksheet=ws_array[grade], col=col, column_object=column)
+					col += 1
+
+				if set(column.heading.split()) & set(TEST_DATA_TYPES):
+					write_column(worksheet=ws_array[grade], col=col, column_object=column)
+					col += 1
+
+	wb.save('test.xls')
+
+
+
+def testing_presets():
+	FINAL_DATA = {
+		"Barney": Student(name="Barney", grade=1),
+		"Jane": Student(name="Jane", grade=1),
+		"Bob": Student(name="Bob", grade=1)
+	}
+
+	FINAL_DATA["Barney"].scores["AIMS"] = 100
+	FINAL_DATA["Barney"].scores["AIMS2"] = 99
+	FINAL_DATA["Jane"].scores["AIMS"] = 70
+	FINAL_DATA["Bob"].scores["AIMS"] = 33
+
+
+
 if __name__ == "__main__":
 	crawl()
 
+
+	write_to_excel_file(FINAL_DATA)
 
 

@@ -32,6 +32,8 @@ def fetch_student(array_of_student_objects, student_name, grade):
 def parse_grade_from_string(_string):
 	grades = [ int(s) for s in re.findall(r'\d+', _string)]
 
+	if "Algebra" in _string:
+		return 9
 	if len(grades) == 0 :
 		return None
 	else:

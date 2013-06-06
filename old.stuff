@@ -1,0 +1,105 @@
+
+def write_scores(excel_worksheet, row, col, student):
+	ws = excel_worksheet
+	for key in student.scores.keys():
+		ws.write(row, col, student.scores[key])
+		col += 1
+
+def write_to_excel_file(data):
+
+	wb = xlwt.Workbook()
+	ws_kinder = wb.add_sheet('Kinder')
+	ws_first = wb.add_sheet('First')
+	ws_second = wb.add_sheet('Second')
+	ws_third = wb.add_sheet('Third')
+	ws_fourth = wb.add_sheet("Fourth")
+	ws_fifth = wb.add_sheet("Fifth")
+	ws_sixth = wb.add_sheet("Sixth")
+	ws_seventh = wb.add_sheet("Seventh")
+	ws_eigth = wb.add_sheet("Eigth")
+
+	row = [ 1, 1, 1, 1, 1, 1, 1, 1, 1 ]
+
+	### add headings
+	a_student = data[data.keys()[0]]
+	the_headings = a_student.scores.keys()
+
+	# row is always zero
+	col = 0
+	for heading in the_headings:
+		ws_kinder.write(0, col, heading)
+		ws_first.write(0, col, heading)
+		ws_second.write(0, col, heading)
+		ws_third.write(0, col, heading)
+		ws_fourth.write(0, col, heading)
+		ws_fifth.write(0, col, heading)
+		ws_sixth.write(0, col, heading)
+		ws_seventh.write(0, col, heading)
+		ws_eigth.write(0, col, heading)
+
+		col += 1
+
+
+	### add data
+	for key in data.keys():
+		student = data[key]
+		col = 0
+
+		if student.grade == 0:
+			# write name
+			ws_kinder.write(row[0], col, student.name)
+			# write scores
+			write_scores(ws_kinder, row[0], col+1, student)
+			# increment row
+			row[0] += 1
+
+		if student.grade == 1:
+			ws_first.write(row[1], col, student.name)
+			# write scores
+			write_scores(ws_first, row[1], col+1, student)
+			row[1] += 1
+
+		if student.grade == 2:
+			ws_second.write(row[2], col, student.name)
+			# write scores
+			write_scores(ws_second, row[2], col+1, student)	
+			row[2] += 1	
+
+		if student.grade == 3:
+			ws_third.write(row[3], col, student.name)
+			# write scores
+			write_scores(ws_third, row[3], col+1, student)
+			row[3] += 1
+
+		if student.grade == 4:
+			ws_fourth.write(row[4], col, student.name)
+			# write scores
+			write_scores(ws_fourth, row[4], col+1, student)
+			row[4] += 1
+
+		if student.grade == 5:
+			ws_fifth.write(row[5], col, student.name)
+			# write scores
+			write_scores(ws_fifth, row[5], col+1, student)
+			row[5] += 1
+
+		if student.grade == 6:
+			ws_sixth.write(row[6], col, student.name)
+			# write scores
+			write_scores(ws_sixth, row[6], col+1, student)
+			row[6] += 1
+
+		if student.grade == 7:
+			ws_seventh.write(row[7], col, student.name)
+			# write scores
+			write_scores(ws_seventh, row[7], col+1, student)
+			row[7] += 1
+
+		if student.grade == 8:
+			ws_eigth.write(row[8], col, student.name)
+			# write scores
+			write_scores(ws_eigth, row[8], col+1, student)
+			row[8] += 1
+
+
+	wb.save('test.xls')
