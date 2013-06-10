@@ -34,10 +34,25 @@ def parse_grade_from_string(_string):
 
 	if "Algebra" in _string:
 		return 9
+	if "Bechtold" in _string:
+		return None
+	if "KG" in _string:
+		return 0 # kindergarden
 	if len(grades) == 0 :
 		return None
 	else:
 		return grades[0]
 
+def read_user_info_file():
+	user_info = {}
+	f = open('user.info', 'r')
+	for line in f.readlines():
+		line = line.strip("\n")
+		parts = line.split(" ")
+		key = parts[0]
+		value = parts[1]
 
+		user_info[key] = value
+
+	return user_info
 

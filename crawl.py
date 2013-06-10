@@ -3,7 +3,7 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import *
 
-from custom_mod import Student, fetch_student, parse_grade_from_string
+from custom_mod import Student, fetch_student, parse_grade_from_string, read_user_info_file
 
 import cProfile
 
@@ -15,6 +15,8 @@ import csv
 
 import xlwt
 
+import sys
+
 ### globals
 FINAL_DATA = {}
 SKIPPED_FIRST = False
@@ -24,6 +26,18 @@ GRADE = None
 TESTING = False
 
 ## methods
+def custom_loader(id_string, web_driver):
+	loading = True
+	while loading:
+		try:
+			web_object = web_driver.find_element_by_id(id_string)
+			loading = False
+		except NoSuchElementException:
+			loading = True
+			print "Could not find %s. Retrying." % id_string
+			pass
+
+	return web_object
 
 def handle_row(row):
 
@@ -53,7 +67,8 @@ def handle_row(row):
 			FINAL_DATA[name] = s
 			pass
 
-def galileo_crawl():
+
+def galileo_crawl(username, password):
 
 	global SKIPPED_FIRST
 	global FINAL_DATA
@@ -65,11 +80,11 @@ def galileo_crawl():
 	driver.get("https://www.assessmenttechnology.com/GalileoASP/ASPX/K12Login.aspx")
 
 	emailid=driver.find_element_by_id("txtUsername")
-	emailid.send_keys("mcosta@scstucson.org")
+	emailid.send_keys(username)
 
 
 	passw=driver.find_element_by_id("txtPassword")
-	passw.send_keys("galileo")
+	passw.send_keys(password)
 
 	signin=driver.find_element_by_id("btnLogin")
 	signin.click()
@@ -94,136 +109,185 @@ def galileo_crawl():
 
 	driver.switch_to_window(benchmark_window)
 
-	### iterate through classes, libraries and subjects to find all tests
-	try:
-		class_dropdown = driver.find_element_by_id("ClassPicker_cboClass")
-		class_dropdown_options = class_dropdown.find_elements_by_tag_name("option")
 
-		num_of_classes = len(class_dropdown_options)
-		i = 0
-	except NoSuchElementException:
-		driver.quit()
+	### wait for page to load
+	### sometimes it seems to be unable to find the ClassPicker_cboClass dom element
+	loading = True
+	while loading:
+		### upsettingly sometimes the dropdown is called "ClassPicker_cboClass" and sometimes "ClassPicker$cboClass"
+		try:
+			class_dropdown = driver.find_element_by_id("ClassPicker_cboClass")
+			class_dropdown_options = class_dropdown.find_elements_by_tag_name("option")
+			loading = False
+		except NoSuchElementException:
+			loading = True
+			print "Could not find ClassPicker_cboClass"
+			print driver.title
+			try:
+				class_dropdown = driver.find_element_by_id("ClassPicker$cboClass")
+				class_dropdown_options = class_dropdown.find_elements_by_tag_name("option")
+				loading = False
+			except NoSuchElementException:
+				loading = True
+				print "Could not find option 2 ClassPicker$cboClass"
+				print driver.title
+
+
+
+	### iterate through classes, libraries and subjects to find all tests
+	num_of_classes = len(class_dropdown_options)
+	i = 0
+
+	## only need to visit each grade once.
+	##                 kinder  1      2       3      4      5      6     7      8     9       10     NAG (not a grade)
+	grades_visited = [ False, False, False, False, False, False, False, False, False, False, False, False ]
 
 	#while i < num_of_classes:
-	while i < 2:
+	while i < num_of_classes:
 		### page refreshes after every select
 		### so have to continuously reselct class_dropdown
 		try : 
-			class_dropdown = driver.find_element_by_id("ClassPicker_cboClass")
+			class_dropdown =custom_loader("ClassPicker_cboClass", driver)
 			class_dropdown_options = class_dropdown.find_elements_by_tag_name("option")
-			option = class_dropdown_options[i]
+			class_option = class_dropdown_options[i]
+
+			### because objects go stale on refresh, save text
+			class_option_text = class_option.text
 
 			### find grade of the current class
-			GRADE = parse_grade_from_string(option.text)
+			GRADE = parse_grade_from_string(class_option.text)
 
-			### click (refreshes Page)
-			i += 1
-			option.click()
+			if GRADE == None:
+				GRADE = 11  ## NAG
+				grades_visited[GRADE] = True
 
-			### now iterate through each library for that class
-			library_dropdown = driver.find_element_by_id("cboLibraries")
-			library_dropdown_options = library_dropdown.find_elements_by_tag_name("option")
+			### check if we've visited this grade or not already
+			if grades_visited[GRADE]:
+				i += 1
+			else:
+				grades_visited[GRADE] = True
 
-			num_of_libs = len(library_dropdown_options)
-			j = 0
+				### click (refreshes Page)
+				i += 1
+				class_option.click()
 
-			while j < num_of_libs and num_of_libs != 0:
-				try: 
-					library_dropdown = driver.find_element_by_id("cboLibraries")
-					library_dropdown_options = library_dropdown.find_elements_by_tag_name("option")
-					option = library_dropdown_options[j]
+				### now iterate through each library for that class
+				library_dropdown = custom_loader("cboLibraries", driver)
+				library_dropdown_options = library_dropdown.find_elements_by_tag_name("option")
 
-					skip = False
-					## list of words to skip
-					skip_words = ["reading", "writing", "Reading", "Writing", "Science", "science", "Select", "select"]
-					for word in skip_words:
-						if word in option.text:
+				num_of_libs = len(library_dropdown_options)
+				print "visitng : %s. which has %d libraries." % (class_option_text, len(library_dropdown_options))
+				
+				j = 0
+
+				while j < num_of_libs and num_of_libs != 0:
+					try: 
+						library_dropdown = custom_loader("cboLibraries", driver)
+						library_dropdown_options = library_dropdown.find_elements_by_tag_name("option")
+						lib_option = library_dropdown_options[j]
+
+						lib_option_text = lib_option.text
+
+						skip = False
+						## list of words to skip
+						skip_words = ["Math", "math", "2011-12", "reading", "writing", "Reading", "Writing", "Science", "science", "Select", "select"]
+						for word in skip_words:
+							if word in lib_option.text:
+								j += 1
+								skip = True
+
+						if not skip:
 							j += 1
-							skip = True
 
-					if not skip:
-						j += 1
-						option.click()
+							lib_option.click()
 
-						### now iterate through each subject for that library
-						subject_dropdown = driver.find_element_by_id("ddlSubjects")
-						subject_dropdown_options = subject_dropdown.find_elements_by_tag_name("option")
+							### now iterate through each subject for that library
+							subject_dropdown = custom_loader("ddlSubjects", driver)
+							subject_dropdown_options = subject_dropdown.find_elements_by_tag_name("option")
 
-						num_of_subjects = len(subject_dropdown_options)
-						k = 0
+							num_of_subjects = len(subject_dropdown_options)
+							print "visitng : %s %s. which has %d subjects." % (class_option_text, lib_option_text, len(subject_dropdown_options))
+							k = 0
 
-						while k < num_of_subjects and num_of_subjects != 0:
-							try: 
-								subject_dropdown = driver.find_element_by_id("ddlSubjects")
-								subject_dropdown_options = subject_dropdown.find_elements_by_tag_name("option")
-								option = subject_dropdown_options[k]
+							while k < num_of_subjects and num_of_subjects != 0:
+								try: 
+									subject_dropdown = custom_loader("ddlSubjects", driver)
+									subject_dropdown_options = subject_dropdown.find_elements_by_tag_name("option")
+									sub_option = subject_dropdown_options[k]
 
-								## check if GRADE is set
-								## if not, try to parse it from the subject name (where it is sometimes)
-								if GRADE == None:
-									GRADE = parse_grade_from_string(option.text)
+									sub_option_text = sub_option.text
 
-								skip_words = ["Science", "science", "Biology", "biology", "Chemistry", "chemistry", "Physics", "physics", "Select", "select"]
-								skip = False
-								for word in skip_words:
-									if word in option.text:
-										k += 1
+									## check if GRADE is set
+									## if not, try to parse it from the subject name (where it is sometimes)
+									if GRADE == None:
+										GRADE = parse_grade_from_string(sub_option.text)
+
+									skip_words = ["Science", "science", "Biology", "biology", "Chemistry", "chemistry", "Physics", "physics", "Select", "select"]
+									skip = False
+
+									### if subject grade != to class grade. skip
+									if GRADE != parse_grade_from_string(sub_option.text):
 										skip = True
 
-								if not skip:
-									k += 1
-									option.click()
+									for word in skip_words:
+										if word in sub_option.text:
+											skip = True
 
-									### now we have to scrape student data
-									try:
-										result_table = driver.find_element_by_id("tableResults")
-										result_table_rows = result_table.find_elements_by_tag_name("tr")
-										### use first row to deduce "data structure"
-										row = result_table_rows[0]
-										cols = row.find_elements_by_tag_name("td")
+									if not skip:
+										print "visitng : %s %s %s" % (class_option_text, lib_option_text, sub_option_text)
 
-										### if only two cols, then no data
-										if len(cols) > 2:
-											COLUMN_NAMES = []
-											for col in cols:
-												COLUMN_NAMES.append(col.text)
+										k += 1
+										sub_option.click()
 
-											# map compiles to C for performance
-											# or so i've been told, it does seem faster
-											map(handle_row, result_table_rows)
-											## reset skipped first
-											SKIPPED_FIRST = False
+										### now we have to scrape student data
+										try:
+											result_table = driver.find_element_by_id("tableResults")
+											result_table_rows = result_table.find_elements_by_tag_name("tr")
+											### use first row to deduce "data structure"
+											row = result_table_rows[0]
+											cols = row.find_elements_by_tag_name("td")
+
+											### if only two cols, then no data
+											if len(cols) > 2:
+												COLUMN_NAMES = []
+												for col in cols:
+													COLUMN_NAMES.append(col.text)
+
+												# map compiles to C for performance
+												# or so i've been told, it does seem faster
+												map(handle_row, result_table_rows)
+												## reset skipped first
+												SKIPPED_FIRST = False
 
 
-									except NoSuchElementException:
-										continue
+										except NoSuchElementException:
+											continue
+									else: ## skip is true
+										k += 1
 
+								except NoSuchElementException:
+									print "couldn't find subject"
+									continue
+								except IndexError:
+									continue
 
-							except NoSuchElementException:
-								continue
-							except IndexError:
-								continue
-
-				except NoSuchElementException:
-					continue
-				except IndexError:
-					continue
+					except NoSuchElementException:
+						print "couldn't find library."
+						continue
+					except IndexError:
+						continue
 
 		except NoSuchElementException:
 			### try again, sometimes the page doesn't seem to finish loading or something
 			### aka the driver.title shows up blank and it can't find elements
+			print "Couldn't find class."
 			continue
 		except IndexError:
 			continue
 
 	driver.quit()
 
-def dibels_crawl():
-	#### CREDENTIALS
-
-	DIBELS_USER = "chavez4th"
-	DIBELS_PW = "dibels4th"
-
+def dibels_crawl(username, password):
 
 	def printResponse(response):
 
@@ -259,8 +323,8 @@ def dibels_crawl():
 
 	br.select_form("login")
 
-	br["name"] = DIBELS_USER
-	br["password"] = DIBELS_PW
+	br["name"] = username
+	br["password"] = password
 
 	response = br.submit()
 
@@ -297,22 +361,36 @@ def dibels_crawl():
 
 
 def crawl():
-	galileo_crawl()
-	dibels_crawl()
+
+	try:
+		user_info = read_user_info_file()
+
+	except IOError:
+		print "Unable to read user info from file."
+		sys.exit(1)
+
+	try:
+		galileo_crawl(username=user_info["user_galileo"], password=user_info["password_galileo"])
+	except:
+		e = sys.exc_info()[0]
+		print"Error: %s" % e
+		print "galileo crawl crashed."
+		raise
+	try:
+		dibels_crawl(username=user_info['user_dibels'], password=user_info['password_dibels'])
+	except:
+		e = sys.exc_info()[0]
+		print"Error: %s" % e
+		print "dibels crawl crashed."
+		raise
 
 	count = 0
-	score_count = 0
 	for name in FINAL_DATA.keys():
 		count += 1
-		print ""
-		print ""
-		print FINAL_DATA[name].grade, name
-		for key in FINAL_DATA[name].scores.keys():
-			score_count += 1
-			print key + " = " + FINAL_DATA[name].scores[key]
+		if FINAL_DATA[name].grade == 3 or FINAL_DATA[name].grade == 25:
+			print FINAL_DATA[name].grade, name, len(FINAL_DATA[name].scores)
 
 	print "There were %d students." % count
-	print "There were %d scores." % score_count
 
 
 def write_column(worksheet, col, column_object):
@@ -366,14 +444,13 @@ def write_to_excel_file(data):
 			student_names = []
 			for student in students:
 				student_names.append(student.name)
+			student_names = sorted(student_names)
 			column0 = Column(heading="Student", data_array=student_names)
 
 			### find all types of scores
 			score_headings = set()
 			for student in students:
 				score_headings = set( score_headings | set(student.scores.keys()))
-
-			print "All headings = " + str(score_headings)
 
 			### build column for each score
 			score_columns = []
@@ -386,7 +463,7 @@ def write_to_excel_file(data):
 						### not all students will necessarily have taken the same tests
 						### and may have different headings
 						### so simply appenda  blank score if they dont' have the heading
-						scores.append("blank")
+						scores.append("")
 						pass
 				score_columns.append(Column(heading=heading, data_array=scores))
 
@@ -396,18 +473,24 @@ def write_to_excel_file(data):
 			## write other columns
 			col = 1
 			for column in score_columns:
-				### only write columns of approved data types
-				if column.heading.split("_")[0] in DIBELS_DATA_TYPES:
-					write_column(worksheet=ws_array[grade], col=col, column_object=column)
-					col += 1
-				print column.heading.split(" ")
-				if set(column.heading.split(" ")) & set(GALILEO_DATA_TYPES):
-					write_column(worksheet=ws_array[grade], col=col, column_object=column)
-					col += 1
+				### check if column actuall has scores in it or not ( many columns will be blank for one grade but not another )
+				empty = True
+				for item in column.data:
+					if item != "":
+						empty = False
 
-				if set(column.heading.split()) & set(TEST_DATA_TYPES):
-					write_column(worksheet=ws_array[grade], col=col, column_object=column)
-					col += 1
+				if not empty:
+					### only write columns of approved data types
+					if column.heading.split("_")[0] in DIBELS_DATA_TYPES:
+						write_column(worksheet=ws_array[grade], col=col, column_object=column)
+						col += 1
+					if set(column.heading.split(" ")) & set(GALILEO_DATA_TYPES):
+						write_column(worksheet=ws_array[grade], col=col, column_object=column)
+						col += 1
+
+					if set(column.heading.split()) & set(TEST_DATA_TYPES):
+						write_column(worksheet=ws_array[grade], col=col, column_object=column)
+						col += 1
 
 	wb.save('test.xls')
 
