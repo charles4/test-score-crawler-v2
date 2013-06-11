@@ -34,11 +34,13 @@ def parse_grade_from_string(_string):
 
 	if "Algebra" in _string:
 		return 9
-	if "Bechtold" in _string:
+	elif "Bechtold" in _string:
 		return None
-	if "KG" in _string:
+	elif "KG" in _string:
 		return 0 # kindergarden
-	if len(grades) == 0 :
+	elif "K" in _string.split("_"):
+		return 0
+	elif len(grades) == 0 :
 		return None
 	else:
 		return grades[0]

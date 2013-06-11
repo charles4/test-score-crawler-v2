@@ -14,8 +14,9 @@ from datetime import date
 import csv
 
 import xlwt
-
 import sys
+import re
+import os
 
 ### globals
 FINAL_DATA = {}
@@ -332,7 +333,9 @@ def dibels_crawl(username, password):
 	d = date.today()
 	year = d.year - 1 
 
-	br.open("https://dibels.uoregon.edu/reports/report.php?report=DataFarming&Scope=School&district=572&School=3271&Grade=_ALL_&StartYear=%s&EndYear=%s&Assessment=10000&AssessmentPeriod=_ALL_&StudentFilter=none&Fields[]=&Fields[]=1&Fields[]=2&Fields[]=22&Fields[]=25&Fields[]=41&Delimiter=0" % (year, year))
+	### start year and end year are the same
+	### aka the school year 2012-13 is just 2012, 2012
+	br.open("https://dibels.uoregon.edu/reports/report.php?report=DataFarming&Scope=District&district=572&Grade=_ALL_&StartYear=%s&EndYear=%s&Assessment=10000&AssessmentPeriod=_ALL_&StudentFilter=none&Fields[]=&Fields[]=1&Fields[]=41&Delimiter=0" % (year, year))
 
 	response = br.response()
 	download_link = br.links(text_regex="Download Full Dataset")
@@ -392,21 +395,40 @@ def crawl():
 
 	print "There were %d students." % count
 
+	report = write_to_excel_file(FINAL_DATA)
 
-def write_column(worksheet, col, column_object):
+	return report
+
+
+def translate_dibels_score(score):
+	if re.match(r'Low Risk', score, re.IGNORECASE):
+		return "B"
+	elif re.match(r'Some Risk', score, re.IGNORECASE):
+		return "S"
+	elif re.match(r'At Risk', score, re.IGNORECASE):
+		return "I"
+	else:
+		return ""
+
+
+def write_rows(worksheet, rows):
 	ws = worksheet
 
-	ws.write(0, col, column_object.heading)
-
-	for x in range(len(column_object.data)):
-		ws.write(x+1, col, column_object.data[x])
+	for y in range(len(rows)):
+		for x in range(len(rows[y])):
+			if rows[y][x] == "B":
+				style1 = xlwt.easyxf('pattern: pattern solid, fore_colour light_green;')
+				ws.write(y, x, rows[y][x], style1)
+			elif rows[y][x] == "S":
+				style1 = xlwt.easyxf('pattern: pattern solid, fore_colour light_yellow;')
+				ws.write(y, x, rows[y][x], style1)
+			elif rows[y][x] == "I":
+				style1 = xlwt.easyxf('pattern: pattern solid, fore_colour red;')
+				ws.write(y, x, rows[y][x], style1)
+			else:
+				ws.write(y, x, rows[y][x])
 
 def write_to_excel_file(data):
-
-	# types of data we care about
-	DIBELS_DATA_TYPES = [ "Benchmark" ]
-	GALILEO_DATA_TYPES = [ "CBO", "CBAS", "Posttest"]
-	TEST_DATA_TYPES = [ "AIMS", "AIMS2"]
 
 	wb = xlwt.Workbook()
 	ws_kinder = wb.add_sheet('Kinder')
@@ -423,76 +445,127 @@ def write_to_excel_file(data):
 	### append ws to an array for easy access
 	ws_array = [ ws_kinder, ws_first, ws_second, ws_third, ws_fourth, ws_fifth, ws_sixth, ws_seventh, ws_eighth, ws_nineth ]
 
-	class Column(object):
-		def __init__(self, heading, data_array):
-			self.heading = heading
-			self.data = data_array
+	### go through and make a row from each student
+	COLUMN_NAMES = [ 	
+						"Student Name",
+						"AIMS Reading", "AIMS Math", 
+						"Galileo 1: Reading", "Galileo 1: Math", 
+						"Galileo 2: Reading", "Galileo 2: Math",
+						"Galileo 3: Reading", "Galileo 3: Math",
+						"Dibels 1", "Dibels 2", "Dibels 3",
+						"Standford 10: Reading" , "Standford 10: Lang", "Standford 10: Math"
+					]
 
-	### go through each grade, building one column at a time
-
-	## 0-9
-	for grade in range(10):
+	### translate all students & scores into rows
+	for grade in range(len(ws_array)):
 		### want array for guarenteed order
+		### find all studnets in grade
 		students = []
 		for key in data.keys():
 			if data[key].grade == grade:
 				students.append(data[key])
 
+		students = sorted(students, key=lambda student: student.name.lower())
 
-		if len(students) > 0 : 
-			### build name column
-			student_names = []
-			for student in students:
-				student_names.append(student.name)
-			student_names = sorted(student_names)
-			column0 = Column(heading="Student", data_array=student_names)
+		### list of all rows in grade
+		rows = []
 
-			### find all types of scores
-			score_headings = set()
-			for student in students:
-				score_headings = set( score_headings | set(student.scores.keys()))
+		rows.append(COLUMN_NAMES)
 
-			### build column for each score
-			score_columns = []
-			for heading in score_headings:
-				scores = []
-				for student in students:
-					try:
-						scores.append(student.scores[heading])
-					except KeyError:
-						### not all students will necessarily have taken the same tests
-						### and may have different headings
-						### so simply appenda  blank score if they dont' have the heading
-						scores.append("")
-						pass
-				score_columns.append(Column(heading=heading, data_array=scores))
+		for student in students:
+			local_row = [ "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+			local_row[0] = student.name
 
-			## write name column
-			write_column(worksheet=ws_array[grade], col=0, column_object=column0)
+			### translate scores to the local-row
+			for key in student.scores.keys():
 
-			## write other columns
-			col = 1
-			for column in score_columns:
-				### check if column actuall has scores in it or not ( many columns will be blank for one grade but not another )
-				empty = True
-				for item in column.data:
-					if item != "":
-						empty = False
+				### find aims reading
 
-				if not empty:
-					### only write columns of approved data types
-					if column.heading.split("_")[0] in DIBELS_DATA_TYPES:
-						write_column(worksheet=ws_array[grade], col=col, column_object=column)
-						col += 1
-					if set(column.heading.split(" ")) & set(GALILEO_DATA_TYPES):
-						write_column(worksheet=ws_array[grade], col=col, column_object=column)
-						col += 1
+				### find aims math
 
-					if set(column.heading.split()) & set(TEST_DATA_TYPES):
-						write_column(worksheet=ws_array[grade], col=col, column_object=column)
-						col += 1
+				### find galileo reading 1
+				if len(re.findall(r'CBAS Reading .. Gr. #1', key, re.IGNORECASE)) > 0:
+					local_row[3] = student.scores[key]
 
-	wb.save('test.xls')
+				### find galileo math 1
+				elif len(re.findall(r'CBAS Math .. Gr. #1', key, re.IGNORECASE)) > 0:
+					local_row[4] = student.scores[key]
+
+				### galileo reading 2
+				elif len(re.findall(r'CBAS Reading .. Gr. #2', key, re.IGNORECASE)) > 0:
+					local_row[5] = student.scores[key]
+
+				### galileo math 2
+				elif len(re.findall(r'CBAS Math .. Gr. #2', key, re.IGNORECASE)) > 0:
+					local_row[6] = student.scores[key]
+
+				### galileo reading 3
+				elif len(re.findall(r'CBAS Reading .. Gr. #3', key, re.IGNORECASE)) > 0:
+					local_row[7] = student.scores[key]
+
+				### galileo math 3
+				elif len(re.findall(r'CBAS Math .. Gr. #3', key, re.IGNORECASE)) > 0:
+					local_row[8] = student.scores[key]
+
+				### Dibels 1
+				elif len(re.findall(r'Benchmark(\w+)ORF-(\w+)Beginning', key, re.IGNORECASE)) > 0:
+					if parse_grade_from_string(key) == student.grade:
+						local_row[9] = translate_dibels_score(student.scores[key])
+
+				### Dibels 2
+				elif len(re.findall(r'Benchmark(\w+)ORF-(\w+)Middle', key, re.IGNORECASE)) > 0:
+					if parse_grade_from_string(key) == student.grade:
+						local_row[10] = translate_dibels_score(student.scores[key])
+
+				### Dibels 3
+				elif len(re.findall(r'Benchmark(\w+)ORF-(\w+)End', key, re.IGNORECASE)) > 0:
+					if parse_grade_from_string(key) == student.grade:
+						local_row[11] = translate_dibels_score(student.scores[key])
+
+				### DIBELS 1,2,3 for KINDER (named differently)
+				elif parse_grade_from_string(key) == 0 and student.grade == 0:
+					if len(re.findall(r'Benchmark(\w+)LNF(\w+)Beginning', key, re.IGNORECASE)) > 0:
+						local_row[9] = translate_dibels_score(student.scores[key])
+					elif len(re.findall(r'Benchmark(\w+)LNF(\w+)Middle', key, re.IGNORECASE)) > 0:
+						local_row[10] = translate_dibels_score(student.scores[key])
+					elif len(re.findall(r'Benchmark(\w+)LNF(\w+)End', key, re.IGNORECASE)) > 0:
+						local_row[11] = translate_dibels_score(student.scores[key])
+
+				### DIBELS 1 for first grade also sseems to be named differently
+				elif parse_grade_from_string(key) == 1 and student.grade == 1:
+					if len(re.findall(r'Benchmark(\w+)LNF(\w+)Beginning', key, re.IGNORECASE)) > 0:
+						### check if there's a score there already or not (may be an ORF score)
+						if local_row[9] == "":
+							local_row[9] = translate_dibels_score(student.scores[key])
+				else:
+					pass
+
+
+			rows.append(local_row)
+
+		write_rows(ws_array[grade], rows)
+
+
+	d = date.today()
+	last_year = d.year - 1 
+
+	report_name = 'report_%s.xls' % (d)
+	PATH = "/reports"
+
+	count = 0
+	for dirname, dirnames, filenames in os.walk(PATH):
+		for filename in filenames:
+			if filename == report_name:
+				count += 1
+			if re.match(r'report_%s(\w+)' % (d), filename):
+				count += 1 
+
+	if count > 0:
+		report_name = 'report_%s_#%d.xls' % (d, count)
+
+	wb.save(os.path.join(PATH, report_name))
+
+	return report_name
 
 
 
@@ -512,8 +585,5 @@ def testing_presets():
 
 if __name__ == "__main__":
 	crawl()
-
-
-	write_to_excel_file(FINAL_DATA)
 
 
