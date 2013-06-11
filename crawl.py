@@ -37,9 +37,10 @@ def custom_loader(id_string, web_driver):
 			loading = False
 		except NoSuchElementException:
 			if count > 5:
+				print "Could not find %s. Giving up after %d trys." % (id_string, count)
 				return None
 			loading = True
-			print "Could not find %s. Retrying." % id_string
+			print "Could not find %s. Retrying. Count = %d" % (id_string, count)
 			pass
 
 	return web_object
