@@ -246,7 +246,7 @@ def galileo_crawl(username, password):
 
 										### now we have to scrape student data
 										try:
-											result_table = custom_loader("tableResults")
+											result_table = custom_loader("tableResults", driver)
 											result_table_rows = result_table.find_elements_by_tag_name("tr")
 											### use first row to deduce "data structure"
 											row = result_table_rows[0]
