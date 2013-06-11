@@ -28,12 +28,16 @@ TESTING = False
 
 ## methods
 def custom_loader(id_string, web_driver):
+	count = 0
 	loading = True
 	while loading:
 		try:
+			count += 1
 			web_object = web_driver.find_element_by_id(id_string)
 			loading = False
 		except NoSuchElementException:
+			if count > 5:
+				return None
 			loading = True
 			print "Could not find %s. Retrying." % id_string
 			pass
@@ -242,7 +246,7 @@ def galileo_crawl(username, password):
 
 										### now we have to scrape student data
 										try:
-											result_table = driver.find_element_by_id("tableResults")
+											result_table = custom_loader("tableResults")
 											result_table_rows = result_table.find_elements_by_tag_name("tr")
 											### use first row to deduce "data structure"
 											row = result_table_rows[0]
