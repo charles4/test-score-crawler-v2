@@ -132,7 +132,7 @@ def galileo_crawl(username, password):
 
 	### go to benchmarks
 	try:
-		python_link = custom_xpath_loader(".//a")
+		python_link = custom_xpath_loader(".//a", driver)
 		benchmark_link = None
 		for link in python_link:
 			if link.text == "Benchmark Results":
