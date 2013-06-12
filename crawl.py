@@ -255,6 +255,7 @@ def galileo_crawl(username, password):
 
 										k += 1
 										sub_option.click()
+										time.sleep(2)
 
 										### now we have to scrape student data
 										try:
