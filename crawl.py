@@ -47,6 +47,26 @@ def custom_loader(id_string, web_driver):
 
 	return web_object
 
+def custom_xpath_loader(xpath, web_driver):
+	count = 0
+	loading = True
+	while loading:
+		count += 1
+		web_object_list = web_driver.find_elements_by_xpath(xpath)
+		loading = False
+		
+		### web object list is None
+		if not web_object_list:
+			if count > 5:
+				print "Could not find %s. Giving up after %d trys." % (xpath, count)
+				return None
+			loading = True
+			print "Could not find %s. Retrying. Count = %d" % (xpath, count)
+			pass
+
+	return web_object_list
+
+
 def handle_row(row):
 
 	global SKIPPED_FIRST
@@ -90,29 +110,39 @@ def galileo_crawl(username, password):
 	driver= webdriver.Firefox()
 	driver.get("https://www.assessmenttechnology.com/GalileoASP/ASPX/K12Login.aspx")
 
-	emailid=driver.find_element_by_id("txtUsername")
+	emailid=custom_loader("txtUsername", driver)
 	emailid.send_keys(username)
 
 
-	passw=driver.find_element_by_id("txtPassword")
+	passw=custom_loader("txtPassword", driver)
 	passw.send_keys(password)
 
-	signin=driver.find_element_by_id("btnLogin")
+	signin=custom_loader("btnLogin", driver)
 	signin.click()
 
 	## go to dashboard
 
-	python_link = driver.find_elements_by_xpath(".//a[@href='/GalileoASP/ASPX/Dashboard/AdminDashboard.aspx']")[0]
-	python_link.click()
+	try:
+		python_link = custom_xpath_loader(".//a[@href='/GalileoASP/ASPX/Dashboard/AdminDashboard.aspx']", driver)[0]
+		python_link.click()
+	except IndexError:
+		raise
+		sys.exit(1)
+
 
 	### go to benchmarks
-	python_link = driver.find_elements_by_xpath(".//a")
-	benchmark_link = None
-	for link in python_link:
-		if link.text == "Benchmark Results":
-			benchmark_link = link
+	try:
+		python_link = custom_xpath_loader(".//a")
+		benchmark_link = None
+		for link in python_link:
+			if link.text == "Benchmark Results":
+				benchmark_link = link
 
-	benchmark_link.click()
+		benchmark_link.click()
+	except AttributeError:
+		raise
+		sys.exit(1)
+
 
 	#this opens a new window for some stupid reason
 	dashboard_window = driver.window_handles[0]
@@ -120,29 +150,13 @@ def galileo_crawl(username, password):
 
 	driver.switch_to_window(benchmark_window)
 
-
-	### wait for page to load
-	### sometimes it seems to be unable to find the ClassPicker_cboClass dom element
-	loading = True
-	while loading:
-		### upsettingly sometimes the dropdown is called "ClassPicker_cboClass" and sometimes "ClassPicker$cboClass"
-		try:
-			class_dropdown = driver.find_element_by_id("ClassPicker_cboClass")
-			class_dropdown_options = class_dropdown.find_elements_by_tag_name("option")
-			loading = False
-		except NoSuchElementException:
-			loading = True
-			print "Could not find ClassPicker_cboClass"
-			print driver.title
-			try:
-				class_dropdown = driver.find_element_by_id("ClassPicker$cboClass")
-				class_dropdown_options = class_dropdown.find_elements_by_tag_name("option")
-				loading = False
-			except NoSuchElementException:
-				loading = True
-				print "Could not find option 2 ClassPicker$cboClass"
-				print driver.title
-
+	### upsettingly sometimes the dropdown is called "ClassPicker_cboClass" and sometimes "ClassPicker$cboClass"
+	class_dropdown = custom_loader("ClassPicker_cboClass", driver)
+	if class_dropdown != None:
+		class_dropdown_options = class_dropdown.find_elements_by_tag_name("option")
+	else:	
+		class_dropdown = custom_loader("ClassPicker$cboClass", driver)
+		class_dropdown_options = class_dropdown.find_elements_by_tag_name("option")
 
 
 	### iterate through classes, libraries and subjects to find all tests
