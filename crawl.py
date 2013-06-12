@@ -18,6 +18,8 @@ import sys
 import re
 import os
 
+from pyvirtualdisplay import Display
+
 ### globals
 FINAL_DATA = {}
 SKIPPED_FIRST = False
@@ -80,6 +82,9 @@ def galileo_crawl(username, password):
 	global FINAL_DATA
 	global COLUMN_NAMES
 	global GRADE
+
+	display = Display(visible=0, size=(800, 600))
+	display.start()
 
 	### sign in
 	driver= webdriver.Firefox()
@@ -292,6 +297,8 @@ def galileo_crawl(username, password):
 			continue
 
 	driver.quit()
+
+	display.stop()
 
 def dibels_crawl(username, password):
 
