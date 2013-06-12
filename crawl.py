@@ -132,14 +132,9 @@ def galileo_crawl(username, password):
 
 	### go to benchmarks
 	try:
-		python_link = custom_xpath_loader(".//a", driver)
-		benchmark_link = None
-		for link in python_link:
-			if link.text == "Benchmark Results":
-				benchmark_link = link
-
+		benchmark_link = custom_xpath_loader(".//a[@href='/GalileoASP/ASPX/Testing/BenchmarkResults/ClassBenchmarkResults.aspx?centerID=5290a59e-39ce-4f26-b05c-57cc1426bee7&classID=cb1f6107-c1ee-4be0-ac70-4b5cf632e047']", driver)[0]
 		benchmark_link.click()
-	except AttributeError:
+	except IndexError:
 		raise
 		sys.exit(1)
 
