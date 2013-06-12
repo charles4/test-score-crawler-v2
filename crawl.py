@@ -18,7 +18,6 @@ import sys
 import re
 import os
 
-from pyvirtualdisplay import Display
 
 ### globals
 FINAL_DATA = {}
@@ -103,16 +102,10 @@ def galileo_crawl(username, password):
 	global COLUMN_NAMES
 	global GRADE
 
-	display = Display(visible=0, size=(800, 600))
-	display.start()
-
-	time.sleep(5)
 
 	### sign in
 	driver= webdriver.Firefox()
 	driver.get("https://www.assessmenttechnology.com/GalileoASP/ASPX/K12Login.aspx")
-
-	time.sleep(5)
 
 	emailid=custom_loader("txtUsername", driver)
 	emailid.send_keys(username)
@@ -124,14 +117,11 @@ def galileo_crawl(username, password):
 	signin=custom_loader("btnLogin", driver)
 	signin.click()
 
-	time.sleep(5)
-
 	## go to dashboard
 
 	try:
 		python_link = custom_xpath_loader(".//a[@href='/GalileoASP/ASPX/Dashboard/AdminDashboard.aspx']", driver)[0]
 		python_link.click()
-		time.sleep(5)
 	except IndexError:
 		raise
 		sys.exit(1)
@@ -141,7 +131,6 @@ def galileo_crawl(username, password):
 	try:
 		benchmark_link = custom_xpath_loader(".//a[@href='/GalileoASP/ASPX/Testing/BenchmarkResults/ClassBenchmarkResults.aspx?centerID=5290a59e-39ce-4f26-b05c-57cc1426bee7&classID=cb1f6107-c1ee-4be0-ac70-4b5cf632e047']", driver)[0]
 		benchmark_link.click()
-		time.sleep(5)
 	except IndexError:
 		raise
 		sys.exit(1)
@@ -314,8 +303,6 @@ def galileo_crawl(username, password):
 			continue
 
 	driver.quit()
-
-	display.stop()
 
 def dibels_crawl(username, password):
 
