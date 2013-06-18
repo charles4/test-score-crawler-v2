@@ -78,6 +78,7 @@ def handle_row(row):
 	else:
 		cols = row.find_elements_by_tag_name("td")
 		name = cols[0].text
+		name = name.lower()
 		#check if student exists already
 		# returns the student object if it exists, or None
 		try:
@@ -196,8 +197,10 @@ def galileo_crawl(username, password):
 				
 				j = 0
 
-				while j < num_of_libs and num_of_libs != 0:
+				while j < num_of_libs:
 					try: 
+						print "j is %d" % j
+
 						library_dropdown = custom_loader("cboLibraries", driver)
 						library_dropdown_options = library_dropdown.find_elements_by_tag_name("option")
 						lib_option = library_dropdown_options[j]
@@ -208,12 +211,13 @@ def galileo_crawl(username, password):
 						## list of words to skip
 						skip_words = ["Math", "math", "2011-12", "reading", "writing", "Reading", "Writing", "Science", "science", "Select", "select"]
 						for word in skip_words:
-							if word in lib_option.text:
-								j += 1
+							if word in lib_option_text:
+								print "Skipping %s" % word, lib_option_text
 								skip = True
 
+						j += 1
+
 						if not skip:
-							j += 1
 
 							lib_option.click()
 
@@ -254,7 +258,6 @@ def galileo_crawl(username, password):
 
 										k += 1
 										sub_option.click()
-										time.sleep(2)
 
 										### now we have to scrape student data
 										try:
@@ -286,12 +289,14 @@ def galileo_crawl(username, password):
 									print "couldn't find subject"
 									continue
 								except IndexError:
+									print "index error on k"
 									continue
 
 					except NoSuchElementException:
 						print "couldn't find library."
 						continue
 					except IndexError:
+						print "Library dropdown index error."
 						continue
 
 		except NoSuchElementException:
@@ -362,6 +367,7 @@ def dibels_crawl(username, password):
 	    for row in csv.DictReader(csvfile):
 	    	grade = determine_grade(row)
 	    	name = row["Last"] + ", " + row["First"]
+	    	name = name.lower()
 
 	    	try:
 	    		### try to udpate existing student object 
@@ -444,6 +450,21 @@ def write_rows(worksheet, rows):
 			else:
 				ws.write(y, x, rows[y][x])
 
+def convert_score_to_percent(score_title, score):
+	### galileo scores have min_max in their title
+	try:
+		_min_, _max_ = re.findall(r"Possible Scores: (\w+) to (\w+)", score_title)[0]
+		real_score = re.findall(r"[0-9]+", score)[0]
+	except IndexError:
+		### do nothing, return blank string
+		return ""
+
+	percent = str((float(real_score) / float(_max_)) * 100)[:4]
+
+	return "{0}% ({1}/{2})".format(percent, real_score, _max_)
+
+
+
 def write_to_excel_file(data):
 
 	wb = xlwt.Workbook()
@@ -501,27 +522,27 @@ def write_to_excel_file(data):
 
 				### find galileo reading 1
 				if len(re.findall(r'CBAS Reading .. Gr. #1', key, re.IGNORECASE)) > 0:
-					local_row[3] = student.scores[key]
+					local_row[3] = convert_score_to_percent(score_title=key, score=student.scores[key])
 
 				### find galileo math 1
 				elif len(re.findall(r'CBAS Math .. Gr. #1', key, re.IGNORECASE)) > 0:
-					local_row[4] = student.scores[key]
+					local_row[4] = convert_score_to_percent(score_title=key, score=student.scores[key])
 
 				### galileo reading 2
 				elif len(re.findall(r'CBAS Reading .. Gr. #2', key, re.IGNORECASE)) > 0:
-					local_row[5] = student.scores[key]
+					local_row[5] = convert_score_to_percent(score_title=key, score=student.scores[key])
 
 				### galileo math 2
 				elif len(re.findall(r'CBAS Math .. Gr. #2', key, re.IGNORECASE)) > 0:
-					local_row[6] = student.scores[key]
+					local_row[6] = convert_score_to_percent(score_title=key, score=student.scores[key])
 
 				### galileo reading 3
 				elif len(re.findall(r'CBAS Reading .. Gr. #3', key, re.IGNORECASE)) > 0:
-					local_row[7] = student.scores[key]
+					local_row[7] = convert_score_to_percent(score_title=key, score=student.scores[key])
 
 				### galileo math 3
 				elif len(re.findall(r'CBAS Math .. Gr. #3', key, re.IGNORECASE)) > 0:
-					local_row[8] = student.scores[key]
+					local_row[8] = convert_score_to_percent(score_title=key, score=student.scores[key])
 
 				### Dibels 1
 				elif len(re.findall(r'Benchmark(\w+)ORF-(\w+)Beginning', key, re.IGNORECASE)) > 0:
@@ -582,21 +603,6 @@ def write_to_excel_file(data):
 	wb.save(os.path.join(PATH, report_name))
 
 	return report_name
-
-
-
-def testing_presets():
-	FINAL_DATA = {
-		"Barney": Student(name="Barney", grade=1),
-		"Jane": Student(name="Jane", grade=1),
-		"Bob": Student(name="Bob", grade=1)
-	}
-
-	FINAL_DATA["Barney"].scores["AIMS"] = 100
-	FINAL_DATA["Barney"].scores["AIMS2"] = 99
-	FINAL_DATA["Jane"].scores["AIMS"] = 70
-	FINAL_DATA["Bob"].scores["AIMS"] = 33
-
 
 
 if __name__ == "__main__":
