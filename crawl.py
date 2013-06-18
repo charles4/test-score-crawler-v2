@@ -9,7 +9,6 @@ import cProfile
 
 import json
 
-import mechanize
 from datetime import date
 import csv
 
@@ -17,7 +16,7 @@ import xlwt
 import sys
 import re
 import os
-
+import mechanize
 
 ### globals
 FINAL_DATA = {}
@@ -162,7 +161,7 @@ def galileo_crawl(username, password):
 	#while i < num_of_classes:
 	while i < num_of_classes:
 		### page refreshes after every select
-		### so have to continuously reselct class_dropdown
+		### so have to continuously reselct things
 		try : 
 			class_dropdown =custom_loader("ClassPicker_cboClass", driver)
 			class_dropdown_options = class_dropdown.find_elements_by_tag_name("option")
@@ -247,7 +246,7 @@ def galileo_crawl(username, password):
 										skip = True
 
 									for word in skip_words:
-										if word in sub_option.text:
+										if word in sub_option_text:
 											skip = True
 
 									if not skip:
