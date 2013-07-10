@@ -119,28 +119,30 @@ def galileo_crawl(username, password):
 
 	## go to dashboard
 
-	try:
-		python_link = custom_xpath_loader(".//a[@href='/GalileoASP/ASPX/Dashboard/AdminDashboard.aspx']", driver)[0]
-		python_link.click()
-	except IndexError:
-		raise
-		sys.exit(1)
+	# try:
+	# 	python_link = custom_xpath_loader(".//a[@href='/GalileoASP/ASPX/Dashboard/AdminDashboard.aspx']", driver)[0]
+	# 	python_link.click()
+	# except IndexError:
+	# 	raise
+	# 	sys.exit(1)
+
+	driver.get("https://www.assessmenttechnology.com/GalileoASP/ASPX/Testing/BenchmarkResults/ClassBenchmarkResults.aspx")
 
 
-	### go to benchmarks
-	try:
-		benchmark_link = custom_xpath_loader(".//a[@href='/GalileoASP/ASPX/Testing/BenchmarkResults/ClassBenchmarkResults.aspx?centerID=5290a59e-39ce-4f26-b05c-57cc1426bee7&classID=cb1f6107-c1ee-4be0-ac70-4b5cf632e047']", driver)[0]
-		benchmark_link.click()
-	except IndexError:
-		raise
-		sys.exit(1)
+	# ### go to benchmarks
+	# try:
+	# 	benchmark_link = custom_xpath_loader(".//a[@href='/GalileoASP/ASPX/Testing/BenchmarkResults/ClassBenchmarkResults.aspx?centerID=5290a59e-39ce-4f26-b05c-57cc1426bee7&classID=cb1f6107-c1ee-4be0-ac70-4b5cf632e047']", driver)[0]
+	# 	benchmark_link.click()
+	# except IndexError:
+	# 	raise
+	# 	sys.exit(1)
 
 
-	#this opens a new window for some stupid reason
-	dashboard_window = driver.window_handles[0]
-	benchmark_window = driver.window_handles[1]
+	# #this opens a new window for some stupid reason
+	# dashboard_window = driver.window_handles[0]
+	# benchmark_window = driver.window_handles[1]
 
-	driver.switch_to_window(benchmark_window)
+	# driver.switch_to_window(benchmark_window)
 
 	### upsettingly sometimes the dropdown is called "ClassPicker_cboClass" and sometimes "ClassPicker$cboClass"
 	class_dropdown = custom_loader("ClassPicker_cboClass", driver)
